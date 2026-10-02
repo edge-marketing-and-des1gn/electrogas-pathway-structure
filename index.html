@@ -24,6 +24,7 @@
     --key-event:#B8860B;
     --organic:#1E8A6E;
     --paid:#B4552F;
+    --place:#2F5D9B;
     --font-display:'Space Grotesk',sans-serif;
     --font-body:'IBM Plex Sans',sans-serif;
     --font-mono:'IBM Plex Mono',monospace;
@@ -35,7 +36,7 @@
 
   header{border-bottom:1px solid var(--line);padding:14px 0 12px;}
   .period-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;}
-  .channel-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px;}
+  .channel-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;}
   .data-status{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-dimmer);margin:0;padding:2px 8px 2px 6px;border:1px solid var(--line);border-radius:20px;line-height:1.6;}
   .data-status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--text-dimmer);flex:none;}
   .data-status.is-live{color:#1E8A6E;border-color:#BFE3D4;background:#F1FAF6;}
@@ -79,6 +80,24 @@
   .seg.channel button[data-channel=paid].active{background:var(--paid);color:#fff;}
   .channel-note{font-size:11.5px;color:var(--text-dimmer);max-width:46ch;line-height:1.5;margin:0;}
 
+  /* location switch — one pill per place, each with its session count
+     for the period and traffic type on screen. Like the traffic switch,
+     it rebuilds every number on the page. */
+  .location-row{display:flex;align-items:flex-start;gap:10px;margin:0 0 12px;}
+  .location-label{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;color:var(--text-dimmer);padding-top:8px;flex:none;}
+  .loc-list{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;}
+  .loc-btn{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-body);font-size:12px;font-weight:500;line-height:1.5;
+    padding:4px 12px;border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--text-dim);cursor:pointer;
+    white-space:nowrap;transition:background .15s ease,color .15s ease,border-color .15s ease;}
+  .loc-btn:hover{background:var(--bg);color:var(--text);border-color:#CFD4DC;}
+  .loc-btn svg{flex:none;opacity:.6;}
+  .loc-btn .ln{font-family:var(--font-mono);font-size:10px;font-weight:400;color:var(--text-dimmer);}
+  .loc-btn.is-empty{color:var(--text-dimmer);}
+  .loc-btn.active{background:var(--place);border-color:var(--place);color:#fff;}
+  .loc-btn.active svg{opacity:.85;}
+  .loc-btn.active .ln{color:#fff;opacity:.8;}
+  .loc-sep{width:1px;height:16px;background:var(--line);margin:0 3px;flex:none;}
+
   .custom-range{display:inline-flex;align-items:stretch;}
   .custom-range input[type=date]{font-family:var(--font-mono);font-size:9.5px;padding:4px 7px;line-height:1.6;
     border:none;border-right:1px solid var(--line);color:var(--text-dim);background:#fff;width:118px;}
@@ -111,6 +130,7 @@
   .scope-chip{font-family:var(--font-mono);font-size:9.5px;padding:2px 8px;border-radius:20px;border:1px solid;line-height:1.6;}
   .scope-chip.organic{color:var(--organic);border-color:#BFE3D4;background:#F1FAF6;}
   .scope-chip.paid{color:var(--paid);border-color:#EED3C6;background:#FCF4F0;}
+  .scope-chip.place{color:var(--place);border-color:#C9D8EC;background:#F2F6FB;}
   .seg.zoom button{min-width:34px;font-size:11px;padding:3px 8px;}
   .seg.zoom button.level{min-width:52px;font-family:var(--font-mono);font-size:9.5px;}
 
@@ -258,6 +278,9 @@
     .barcell{display:none;}
     .seg.channel button{min-width:78px;padding:6px 10px;}
     .custom-range input[type=date]{width:96px;}
+    .location-row{flex-direction:column;gap:4px;}
+    .location-label{padding-top:0;}
+    .loc-sep{display:none;}
   }
   @media (prefers-reduced-motion:reduce){
     *{transition:none !important;scroll-behavior:auto !important;}
@@ -302,7 +325,11 @@
           <span class="cl">Paid</span><span class="cn" data-count>—</span>
         </button>
       </div>
-      <p class="channel-note" id="channelNote">Every number below — the paths, the events, the totals — is rebuilt for whichever traffic you pick.</p>
+      <p class="channel-note" id="channelNote">Every number below — the paths, the events, the totals — is rebuilt for whichever traffic and location you pick.</p>
+    </div>
+    <div class="location-row">
+      <span class="location-label" id="locationLabel">LOCATION</span>
+      <div class="loc-list" id="locationSwitch" role="group" aria-labelledby="locationLabel"></div>
     </div>
 
     <p class="notice" id="notice" role="status" hidden></p>
@@ -391,14 +418,15 @@
   </div>
 
   <footer>
-    <p id="footerMain">Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session on the site in the period, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.</p>
+    <p id="footerMain">Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session in the period for the traffic and location picked above, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.</p>
     <details>
       <summary>Notes on how this was put together</summary>
       <p>Sessions are grouped first by the page they started on, which is why the total matches Google Analytics' own session count rather than only counting homepage arrivals. The step after a starting page is an exact count: sessions that started there and opened that page next. From the third page on, numbers marked ≈ are estimates. Google Analytics' reporting API doesn't hand out full step-by-step sequences (its Path Exploration report isn't available through it), so each deeper step takes the sessions on that branch and applies the share of visitors who moved on from that page to each next one, among sessions that started on the same page. That way each journey thins out step by step the way real visits do, and ends once a step drops below one session.</p>
       <p>A + marks a page with a next step: click it to open that one step, then keep clicking the + on the pages beneath to follow the journey as far as you like. − closes a step and everything opened under it. "Collapse steps" closes them all.</p>
       <p>Organic and Paid are Google Analytics' own session channel groups, applied at the source: picking one rebuilds the whole report from that traffic rather than filtering a mixed one afterwards. Organic covers organic search, social, video and shopping; Paid covers paid search, social, shopping, video, display and cross-network. Direct, referral and email traffic belongs to neither, so it appears only under All traffic — which is why Organic and Paid don't add up to the total.</p>
+      <p>Location is Google Analytics' own country and region for each visitor, worked out from their IP address, and it is applied at the source in the same way: picking a province rebuilds the paths, events and totals from that province's sessions for the period and traffic type on screen. The number on each location button is its sessions for that same period and traffic type. The provinces add up to Canada; All locations also includes every visitor outside Canada, which is why the provinces don't add up to it. "Province unknown" is Canadian traffic Google couldn't place in a province. IP-based location is approximate — a VPN, a mobile carrier or a head-office network can put a visitor in the wrong province.</p>
       <p>Addresses that differ only by a tracking code (?utm_…, ?gclid=…), a #section link, http/https, www or a trailing slash are counted as the same page. Smaller paths are grouped into "Other pages" so no branch becomes a wall of tiny entries; it's a group rather than one page, so it isn't linked or expandable. Current Promotions isn't linked either — it no longer exists on the site, though sessions that visited it while it did are still counted.</p>
-      <p>When Google Signals is switched on, Google Analytics withholds rows with very small counts to protect privacy. If that happened for the period on screen, a note appears at the top and some low-traffic steps may be missing.</p>
+      <p>When Google Signals is switched on, Google Analytics withholds rows with very small counts to protect privacy. If that happened for the period on screen, a note appears at the top and some low-traffic steps may be missing. A single province has smaller counts than the whole site, so it happens more often there.</p>
     </details>
   </footer>
 </div>
@@ -519,18 +547,39 @@ const FALLBACK_PAGE_SESSIONS = {
   "/project/gasalert-microclip-series/": 495, "/join-our-team/": 668, "/service/": 233,
 };
 
-// The example data is one mixed-traffic month. Organic and Paid scale it
-// to a plausible share so the switch still works, while the banner says
-// plainly that none of it is live.
+// The example data is one mixed-traffic month, everywhere. Organic,
+// Paid and each location scale it to a plausible share so the switches
+// still work, while the banner says plainly that none of it is live.
 const FALLBACK_SHARE = { all: 1, organic: 0.55, paid: 0.18 };
+const FALLBACK_REGIONS = [
+  { name: 'Alberta', share: 0.34 },
+  { name: 'British Columbia', share: 0.13 },
+  { name: 'Ontario', share: 0.11 },
+  { name: 'Saskatchewan', share: 0.08 },
+  { name: 'Manitoba', share: 0.05 },
+  { name: 'Quebec', share: 0.04 },
+  { name: 'Nova Scotia', share: 0.02 },
+  { name: 'New Brunswick', share: 0.01 },
+];
+const FALLBACK_CANADA_SHARE = FALLBACK_REGIONS.reduce((s, r) => s + r.share, 0);
 
+function fallbackRegionShare(region){
+  const key = String(region).toLowerCase();
+  if (key === 'all') return 1;
+  if (key === 'canada') return FALLBACK_CANADA_SHARE;
+  const r = FALLBACK_REGIONS.find(x => x.name.toLowerCase() === key);
+  return r ? r.share : 0.005;
+}
 function scaleTree(node, f){
   const out = { name: node.name, value: Math.max(1, Math.round(node.value * f)) };
   if (node.children) out.children = node.children.map(c => scaleTree(c, f));
   return out;
 }
-function fallbackFor(channel){
-  const f = FALLBACK_SHARE[channel] || 1;
+function fallbackFor(channel, region){
+  const cf = FALLBACK_SHARE[channel] || 1;
+  const rf = fallbackRegionShare(region);
+  const f = cf * rf;
+  const base = FALLBACK_TREE.value;
   const pageSessions = {};
   Object.keys(FALLBACK_PAGE_SESSIONS).forEach(k => { pageSessions[k] = Math.round(FALLBACK_PAGE_SESSIONS[k] * f); });
   return {
@@ -540,11 +589,18 @@ function fallbackFor(channel){
       sessions: r.sessions === null ? null : Math.max(1, Math.round(r.sessions * f))
     })),
     pageSessions: pageSessions,
-    totalSessions: Math.round(FALLBACK_TREE.value * f),
+    totalSessions: Math.round(base * f),
+    // traffic types, within the location on screen
     channelTotals: {
-      all: FALLBACK_TREE.value,
-      organic: Math.round(FALLBACK_TREE.value * FALLBACK_SHARE.organic),
-      paid: Math.round(FALLBACK_TREE.value * FALLBACK_SHARE.paid)
+      all: Math.round(base * rf),
+      organic: Math.round(base * FALLBACK_SHARE.organic * rf),
+      paid: Math.round(base * FALLBACK_SHARE.paid * rf)
+    },
+    // locations, within the traffic type on screen
+    locationTotals: {
+      all: Math.round(base * cf),
+      canada: Math.round(base * cf * FALLBACK_CANADA_SHARE),
+      regions: FALLBACK_REGIONS.map(r => ({ name: r.name, sessions: Math.round(base * cf * r.share) }))
     }
   };
 }
@@ -641,6 +697,13 @@ function categorize(path){
 function colorFor(path){ return COLORS[categorize(path)]; }
 const fmt = n => Number(n || 0).toLocaleString();
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+// A share as a percentage; one decimal place when it's under 10%, so a
+// small province doesn't round away to "0%" or "1%".
+function share(part, whole){
+  if (!whole) return '0%';
+  const v = (part / whole) * 100;
+  return (v > 0 && v < 10 ? v.toFixed(1) : Math.round(v)) + '%';
+}
 
 /* ---- tooltip ---- */
 const tooltip = document.getElementById('tooltip');
@@ -677,13 +740,15 @@ const state = {
   pageSessions: FALLBACK_PAGE_SESSIONS,
   eventsError: null,
   periodLabel: '',
-  viewKey: null,            // which period + traffic is on screen, so a refresh of it keeps open rows open
+  viewKey: null,            // which period + traffic + location is on screen, so a refresh of it keeps open rows open
   estFrom: null,            // chart column where counts become estimates; null for example data
   totalSessions: null,
-  channelTotals: null,
+  channelTotals: null,      // sessions per traffic type, for the location on screen
+  locationTotals: null,     // sessions per location, for the traffic type on screen
   live: false,              // has a real payload ever landed?
   period: { mode: 'range', value: 12 },
   channel: 'organic',
+  region: 'all',            // 'all', 'canada', or a province name exactly as Google Analytics spells it
   view: 'pathway',
   zoom: null,               // null = size itself to the space available
   lastZoom: 1,
@@ -701,6 +766,25 @@ const state = {
 
 const CHANNEL_LABELS = { all: 'All traffic', organic: 'Organic', paid: 'Paid' };
 const rootLabel = () => state.channel === 'all' ? 'All sessions' : CHANNEL_LABELS[state.channel] + ' sessions';
+
+/* ---- locations ---- */
+const REGION_NOT_SET = '(not set)';   // Google Analytics' value when it knows the country but not the province
+const sameRegion = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+function regionLabel(region){
+  if (sameRegion(region, 'all')) return 'All locations';
+  if (sameRegion(region, 'canada')) return 'Canada';
+  if (region === REGION_NOT_SET) return 'Province unknown';
+  return String(region);
+}
+// As it reads after "sessions from …"
+function regionPhrase(region){
+  return region === REGION_NOT_SET ? 'an unknown province' : regionLabel(region);
+}
+// "Organic · Alberta" — the traffic type and, if one is picked, the place.
+function viewName(channel, region, lower){
+  const ch = lower ? CHANNEL_LABELS[channel].toLowerCase() : CHANNEL_LABELS[channel];
+  return ch + (sameRegion(region, 'all') ? '' : ' · ' + regionLabel(region));
+}
 
 // Biggest first, but the "Other pages" rollup always sits last — it's a
 // leftover bucket, not a page competing for attention with the rest.
@@ -740,7 +824,7 @@ function buildChainIndex(){
 }
 
 /* =========================================================
-   4. HEADER — stats, traffic switch
+   4. HEADER — stats, traffic switch, location switch
 ========================================================= */
 function renderStats(){
   const total = state.tree.value || 0;
@@ -748,20 +832,28 @@ function renderStats(){
     const n = findChild(state.tree, p);
     return s + (n ? n.value : 0);
   }, 0);
+  const placed = !sameRegion(state.region, 'all');
+  const where = placed ? ' from ' + regionPhrase(state.region) : '';
+  const traffic = state.channel === 'all' ? '' : CHANNEL_LABELS[state.channel].toLowerCase() + ' ';
 
   const stats = [
-    { n: fmt(total), l: state.channel === 'all' ? 'sessions in total' : CHANNEL_LABELS[state.channel].toLowerCase() + ' sessions' },
+    { n: fmt(total), l: state.channel === 'all' && !placed ? 'sessions in total' : traffic + 'sessions' + where },
   ];
-  // What share of the site this traffic is.
+  // What share of the traffic from this place this traffic type is.
   const ct = state.channelTotals;
   if (state.channel !== 'all' && ct && ct.all){
-    stats.push({ n: Math.round((total / ct.all) * 100) + '%', l: 'of all sessions this period' });
+    stats.push({ n: Math.round((total / ct.all) * 100) + '%', l: placed ? 'of all sessions' + where : 'of all sessions this period' });
+  }
+  // What share of this traffic, everywhere, this place is.
+  const lt = state.locationTotals;
+  if (placed && lt && lt.all){
+    stats.push({ n: share(total, lt.all), l: 'of ' + traffic + 'sessions from all locations' });
   }
   stats.push({ n: fmt(startingPages().length), l: 'pages sessions start on' });
   stats.push({ n: total ? Math.round((shown / total) * 100) + '%' : '0%', l: 'of sessions on the chart' });
 
   document.getElementById('stats').innerHTML =
-    stats.map(s => `<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+    stats.map(s => `<div class="stat"><div class="n">${s.n}</div><div class="l">${escapeHtml(s.l)}</div></div>`).join('');
 }
 
 function renderChannelCounts(){
@@ -773,14 +865,81 @@ function renderChannelCounts(){
     el.textContent = fmt(ct[key]) + ' sessions';
   });
 }
+
+// The Location row: All locations, Canada, then one pill per province
+// Google Analytics reported for the period and traffic type on screen,
+// busiest first. Built from the data, so it shows whichever provinces
+// actually sent traffic and spells them the way the filter needs.
+const PIN_SVG = '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">' +
+  '<path d="M8 14.5s4.5-4.1 4.5-8a4.5 4.5 0 0 0-9 0c0 3.9 4.5 8 4.5 8z"/><circle cx="8" cy="6.5" r="1.6"/></svg>';
+
+function renderLocations(){
+  const wrap = document.getElementById('locationSwitch');
+  const lt = state.locationTotals;
+  const traffic = state.channel === 'all' ? '' : CHANNEL_LABELS[state.channel].toLowerCase() + ' ';
+
+  // With no location list (an older Apps Script, or the list failed to
+  // load) the trunk figure is still the right count for All locations.
+  const allCount = lt ? lt.all : (sameRegion(state.region, 'all') && state.tree ? state.tree.value : null);
+  const items = [{ id: 'all', n: allCount, pin: false,
+    title: 'Every ' + traffic + 'session, wherever the visitor was' }];
+  if (lt){
+    items.push({ id: 'canada', n: lt.canada, pin: false,
+      title: fmt(lt.canada) + ' ' + traffic + 'sessions from Canada — ' + share(lt.canada, lt.all) + ' of all locations' });
+    (lt.regions || []).forEach(r => items.push({ id: r.name, n: r.sessions, pin: true,
+      title: fmt(r.sessions) + ' ' + traffic + 'sessions from ' + regionPhrase(r.name) + ' — ' + share(r.sessions, lt.canada) + ' of Canada' }));
+  }
+  // A place that's selected but sent nothing in this view still needs
+  // its pill, or there'd be nothing lit and no way to tell what's on.
+  if (!items.some(it => sameRegion(it.id, state.region))){
+    items.push({ id: state.region, n: lt ? 0 : null, pin: !sameRegion(state.region, 'canada') });
+  }
+
+  wrap.innerHTML = '';
+  items.forEach((it, i) => {
+    if (it.pin && i > 0 && !items[i - 1].pin){
+      const sep = document.createElement('span');
+      sep.className = 'loc-sep';
+      sep.setAttribute('aria-hidden', 'true');
+      wrap.appendChild(sep);
+    }
+    const on = sameRegion(it.id, state.region);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'loc-btn' + (on ? ' active' : '') + (it.n === 0 ? ' is-empty' : '');
+    btn.dataset.region = it.id;
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (it.title) btn.title = it.title;
+    btn.innerHTML = (it.pin ? PIN_SVG : '') +
+      `<span>${escapeHtml(regionLabel(it.id))}</span>` +
+      `<span class="ln">${it.n === null || it.n === undefined ? '—' : fmt(it.n)}</span>`;
+    btn.addEventListener('click', () => {
+      if (sameRegion(it.id, state.region) && state.live) return;
+      load(state.period, state.channel, it.id);
+    });
+    wrap.appendChild(btn);
+  });
+}
+
 function renderScopeChips(){
+  const bits = [];
+  if (state.channel !== 'all') bits.push(CHANNEL_LABELS[state.channel] + ' sessions only');
+  if (!sameRegion(state.region, 'all')) bits.push(regionLabel(state.region) + (bits.length ? '' : ' only'));
   ['pathwayScope', 'eventsScope'].forEach(id => {
     const el = document.getElementById(id);
-    el.className = 'scope-chip ' + state.channel;
-    if (state.channel === 'all'){ el.style.display = 'none'; return; }
+    el.className = 'scope-chip ' + (state.channel !== 'all' ? state.channel : 'place');
+    if (!bits.length){ el.style.display = 'none'; return; }
     el.style.display = '';
-    el.textContent = state.channel === 'organic' ? 'Organic sessions only' : 'Paid sessions only';
+    el.textContent = bits.join(' · ');
   });
+}
+
+// For a traffic type and place that sent nothing at all in the period.
+function noSessionsMessage(){
+  const traffic = state.channel === 'all' ? '' : CHANNEL_LABELS[state.channel].toLowerCase() + ' ';
+  const placed = !sameRegion(state.region, 'all');
+  return 'No ' + traffic + 'sessions' + (placed ? ' from ' + regionPhrase(state.region) : '') + ' in this period.' +
+    (placed || state.channel !== 'all' ? ' Try a longer period, another traffic type or another location.' : '');
 }
 
 /* =========================================================
@@ -799,7 +958,7 @@ function renderPicker(){
 
   list.innerHTML = '';
   if (!all.length){
-    list.innerHTML = '<p class="picker-note">No page matches that.</p>';
+    list.innerHTML = '<p class="picker-note">' + (q ? 'No page matches that.' : escapeHtml(noSessionsMessage())) + '</p>';
     return;
   }
   const biggest = all[0].value || 1;
@@ -911,8 +1070,13 @@ function renderChart(){
     svg.setAttribute('width', 0); svg.setAttribute('height', 0);
     const box = document.createElement('div');
     box.className = 'chart-empty';
-    box.innerHTML = '<p>Nothing on the chart yet. Tick a starting page on the left and its branch appears here — tick more and they stack up on the same diagram.</p><button type="button">Put the top 10 pages back</button>';
-    box.querySelector('button').addEventListener('click', () => selectTop(DEFAULT_START_COUNT, DEFAULT_OPEN_COUNT));
+    if (!startingPages().length){
+      // Nothing to tick: this traffic type and place sent no sessions.
+      box.innerHTML = '<p>' + escapeHtml(noSessionsMessage()) + '</p>';
+    } else {
+      box.innerHTML = '<p>Nothing on the chart yet. Tick a starting page on the left and its branch appears here — tick more and they stack up on the same diagram.</p><button type="button">Put the top 10 pages back</button>';
+      box.querySelector('button').addEventListener('click', () => selectTop(DEFAULT_START_COUNT, DEFAULT_OPEN_COUNT));
+    }
     scroll.appendChild(box);
     return;
   }
@@ -1075,6 +1239,7 @@ function renderChart(){
         : '<div class="t-meta" style="margin-top:4px;">no onward pages traced from here</div>';
       showTip(
         `<div class="t-path">${v.depth === 0 ? rootLabel() : escapeHtml(friendly(v.name))}</div>` +
+        (v.depth === 0 && !sameRegion(state.region, 'all') ? `<div class="t-sub">${escapeHtml(regionLabel(state.region))} only</div>` : '') +
         (UNLINKABLE.has(v.name) ? '' : `<div class="t-sub">${escapeHtml(v.name)}</div>`) +
         `<div class="t-meta"><span class="t-val">${v.depth > 0 && isEstimate(v.depth) ? '≈' : ''}${fmt(v.value)}</span> sessions${pct ? ' · ' + pct : ''}</div>` +
         (v.depth > 0 && isEstimate(v.depth) ? '<div class="t-meta" style="font-size:11px;">estimated from the step before (see notes)</div>' : '') + action, e);
@@ -1392,11 +1557,13 @@ function renderEvents(){
   const pageCount = new Set(rows.map(r => r.page)).size;
   const typeCount = new Set(rows.map(r => r.event)).size;
   const filtered = state.evKeyOnly || state.evTypes.size || state.evSearch.trim();
+  const dim = t => ` <span style="color:var(--text-dimmer)">· ${t}</span>`;
   summary.innerHTML = rows.length
     ? `<b>${fmt(keyTimes)}</b> <span class="star">★</span> key events and <b>${fmt(totalTimes - keyTimes)}</b> other events, ` +
       `from <b>${fmt(typeCount)}</b> ${typeCount === 1 ? 'kind of event' : 'kinds of event'} across <b>${fmt(pageCount)}</b> ${pageCount === 1 ? 'page' : 'pages'}` +
-      (state.channel === 'all' ? '' : ` <span style="color:var(--text-dimmer)">· ${CHANNEL_LABELS[state.channel].toLowerCase()} sessions</span>`) +
-      (filtered ? ' <span style="color:var(--text-dimmer)">· filtered</span>' : '')
+      (state.channel === 'all' ? '' : dim(CHANNEL_LABELS[state.channel].toLowerCase() + ' sessions')) +
+      (sameRegion(state.region, 'all') ? '' : dim(escapeHtml(regionLabel(state.region)))) +
+      (filtered ? dim('filtered') : '')
     : '';
 
   if (!rows.length){
@@ -1552,8 +1719,8 @@ function setView(view){
   document.getElementById('eventsPanel').style.display = view === 'events' ? '' : 'none';
   document.getElementById('legend').style.display = view === 'pathway' ? '' : 'none';
   document.getElementById('footerMain').textContent = view === 'events'
-    ? 'Counts are sessions and the number of times each event fired. Gold ★ marks a Key Event — Google Analytics\' term for what used to be called a conversion. Automatic events (page views, scrolls, session starts, engagement pings) are left out so real actions stand out.'
-    : 'Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session on the site in the period, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.';
+    ? 'Counts are sessions and the number of times each event fired, for the traffic and location picked above. Gold ★ marks a Key Event — Google Analytics\' term for what used to be called a conversion. Automatic events (page views, scrolls, session starts, engagement pings) are left out so real actions stand out.'
+    : 'Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session in the period for the traffic and location picked above, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.';
   renderCurrent();
 }
 function renderCurrent(){
@@ -1587,15 +1754,20 @@ window.addEventListener('resize', () => {
 
 /* =========================================================
    9. LIVE FEED
-   Sixteen preset combinations (four periods × three traffic types)
-   plus any custom range. What keeps switching fast and the screen
-   never empty:
-   · the last real answer for each preset is saved in this browser,
-     so the report opens instantly and refreshes behind the scenes;
+   A view is a period × a traffic type × a location. Twelve preset
+   views (four periods × three traffic types) exist for every
+   location, plus any custom range. What keeps switching fast and
+   the screen never empty:
+   · the last real answer for each preset view is saved in this
+     browser, so the report opens instantly and refreshes behind
+     the scenes;
    · anything fetched this visit is re-shown from memory;
    · a failed request is retried twice, with a pause, before giving up;
-   · the combinations you haven't opened are collected quietly once
-     the first is on screen;
+   · the "All locations" views you haven't opened are collected
+     quietly once the first is on screen. Province views are fetched
+     when clicked — there are too many to collect in advance — so the
+     first click on a province takes a few seconds and later ones
+     are instant;
    · a slow or failed answer never blanks the screen — what's there
      stays under a spinner, and the buttons snap back if it fails.
    Example numbers only appear when nothing real can be had, and a
@@ -1611,23 +1783,38 @@ const PERIODS = [
 ];
 const CHANNELS = ['all', 'organic', 'paid'];
 
-const CLIENT_CACHE_MS  = 10 * 60 * 1000;  // older than this, a shown combination refreshes quietly
+const CLIENT_CACHE_MS  = 10 * 60 * 1000;  // older than this, a shown view refreshes quietly
 const FETCH_TIMEOUT_MS = 150000;          // a cold 12-month build is the slowest; give it room
 const FETCH_ATTEMPTS   = 3;
 const RETRY_PAUSE_MS   = [800, 2500];     // between attempt 1→2 and 2→3
-const STORE_PREFIX     = 'egPathway:v8:'; // bumped with the Apps Script, so old-shape data is ignored
+const STORE_ROOT       = 'egPathway:';
+const STORE_PREFIX     = STORE_ROOT + 'v9:'; // bumped with the Apps Script, so old-shape data is ignored
 
-const combinationCache = new Map();  // 'month:1|organic' -> payload
-const inFlight = new Map();          // one request per combination, however many clicks
+const combinationCache = new Map();  // 'month:1|organic|alberta' -> payload
+const inFlight = new Map();          // one request per view, however many clicks
 let requestSeq = 0;                  // only the newest request is allowed to paint
 let prefetchStarted = false;
 
-function comboKey(period, channel){
+function comboKey(period, channel, region){
   const p = period.mode === 'custom'
     ? 'custom:' + period.value.start + ':' + period.value.end
     : period.mode + ':' + period.value;
-  return p + '|' + channel;
+  return p + '|' + channel + '|' + String(region || 'all').toLowerCase();
 }
+
+// Removes saved entries whose storage key passes `test`.
+function dropStored(test){
+  const ls = window.localStorage, doomed = [];
+  for (let i = 0; i < ls.length; i++){
+    const k = ls.key(i);
+    if (k && test(k)) doomed.push(k);
+  }
+  doomed.forEach(k => ls.removeItem(k));
+}
+// Anything saved by an earlier version of this page is never read
+// again, so clear it out rather than leave it taking up room.
+try { dropStored(k => k.indexOf(STORE_ROOT) === 0 && k.indexOf(STORE_PREFIX) !== 0); }
+catch (err){ /* storage blocked — the report still works without it */ }
 
 // Presets only — custom ranges are one-offs and would just pile up.
 function readStored(key){
@@ -1641,8 +1828,18 @@ function readStored(key){
 }
 function writeStored(key, payload){
   if (key.indexOf('custom:') === 0) return;
-  try { window.localStorage.setItem(STORE_PREFIX + key, JSON.stringify(payload)); }
-  catch (err){ /* storage full or blocked — the report still works without it */ }
+  let value;
+  try { value = JSON.stringify(payload); } catch (err){ return; }
+  try { window.localStorage.setItem(STORE_PREFIX + key, value); }
+  catch (err){
+    // Storage is full. Single-location views are the ones that can be
+    // spared — the "All locations" views are what the report opens on —
+    // so clear those out and try once more.
+    try {
+      dropStored(k => k.indexOf(STORE_PREFIX) === 0 && !/\|all$/.test(k));
+      window.localStorage.setItem(STORE_PREFIX + key, value);
+    } catch (err2){ /* still full or blocked — the report still works without it */ }
+  }
 }
 function cachedFor(key){
   let c = combinationCache.get(key);
@@ -1666,7 +1863,7 @@ function setNotice(text, kind){
   el.textContent = text;
   el.classList.toggle('is-info', kind === 'info');
 }
-function setActiveButtons(period, channel){
+function setActiveButtons(period, channel, region){
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.classList.toggle('active', period.mode !== 'custom' &&
       btn.dataset.mode === period.mode && Number(btn.dataset.value) === Number(period.value));
@@ -1674,6 +1871,11 @@ function setActiveButtons(period, channel){
   document.getElementById('customRange').classList.toggle('active', period.mode === 'custom');
   document.querySelectorAll('.channel-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.channel === channel);
+  });
+  document.querySelectorAll('.loc-btn').forEach(btn => {
+    const on = sameRegion(btn.dataset.region, region);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
 }
 // Dims whichever panel is on screen and puts a spinner over it; the
@@ -1713,12 +1915,13 @@ function applyData(d, key){
   state.eventsError = d.eventsError || null;
   state.pageSessions = d.pageSessions || null;
   state.channelTotals = d.channelTotals || null;
+  state.locationTotals = d.locationTotals || null;
   buildChainIndex();
 
   // Keep whatever was ticked if it still exists in the new view —
-  // switching from All to Organic shouldn't lose your place. Pages with
-  // no traffic in the new view drop off; if that empties the chart, the
-  // busiest pages come back.
+  // switching from All to Organic, or from Canada to Alberta, shouldn't
+  // lose your place. Pages with no traffic in the new view drop off; if
+  // that empties the chart, the busiest pages come back.
   const available = new Set(startingPages().map(c => c.name));
   state.selected = state.selected.filter(p => available.has(p));
   if (firstLoad || !state.selected.length){
@@ -1727,36 +1930,40 @@ function applyData(d, key){
   }
   if (!sameView) state.evOpen.clear();
   renderChannelCounts();
+  renderLocations();
   renderCurrent();
 }
 
-function showPayload(p, period, channel){
+function showPayload(p, period, channel, region){
   state.period = period;
   state.channel = channel;
+  state.region = region;
   state.periodLabel = p.month || '';
   state.totalSessions = p.totalSessions || null;
   state.live = true;
   state.estFrom = p.estimatedFromDepth || null;
-  setActiveButtons(period, channel);
+  setActiveButtons(period, channel, region);
   const label = p.month || 'this period';
-  setDataStatus('Live · ' + label + ' · ' + CHANNEL_LABELS[channel] + ' · built ' + builtStamp(p), 'live',
+  setDataStatus('Live · ' + label + ' · ' + viewName(channel, region) + ' · built ' + builtStamp(p), 'live',
     p.range ? 'Google Analytics data from ' + p.range.start + ' to ' + p.range.end : '');
   setNotice(p.thresholded
-    ? 'Google Analytics withheld some small counts for ' + label + ' (it does this when Google Signals is on), so a few low-traffic steps may be missing or slightly low.'
+    ? 'Google Analytics withheld some small counts for ' + label + ' (it does this when Google Signals is on), so a few low-traffic steps may be missing or slightly low.' +
+      (sameRegion(region, 'all') ? '' : ' A single location has smaller numbers than the whole site, so this happens more often here.')
     : '', 'info');
-  applyData(p, comboKey(period, channel));
+  applyData(p, comboKey(period, channel, region));
 }
 
-function showFallback(period, channel, reason){
+function showFallback(period, channel, region, reason){
   state.period = period;
   state.channel = channel;
+  state.region = region;
   state.live = false;
   state.estFrom = null;
-  setActiveButtons(period, channel);
+  setActiveButtons(period, channel, region);
   setDataStatus('Example data — not live', 'fallback');
   setNotice('These are example numbers, not Electrogas data. The live Google Analytics feed couldn\'t be reached' +
     (reason ? ' (' + reason + ')' : '') + '. Try again in a minute.');
-  applyData(fallbackFor(channel), 'fallback|' + comboKey(period, channel));
+  applyData(fallbackFor(channel, region), 'fallback|' + comboKey(period, channel, region));
 }
 
 function friendlyError(err){
@@ -1781,30 +1988,41 @@ async function fetchOnce(url){
   }
 }
 
-// One request per combination at a time: clicking again while it loads
-// joins the request already running. Retries live inside the shared
-// promise, so every waiting caller benefits from them.
-function fetchCombination(period, channel){
-  const key = comboKey(period, channel);
+// One request per view at a time: clicking again while it loads joins
+// the request already running. Retries live inside the shared promise,
+// so every waiting caller benefits from them.
+function fetchCombination(period, channel, region){
+  const key = comboKey(period, channel, region);
   if (inFlight.has(key)) return inFlight.get(key);
 
   const param = period.mode === 'custom'
     ? 'customStart=' + period.value.start + '&customEnd=' + period.value.end
     : period.mode === 'range' ? 'rangeMonths=' + period.value : 'months=' + period.value;
   const sep = LIVE_DATA_URL.indexOf('?') === -1 ? '?' : '&';
-  const url = LIVE_DATA_URL + sep + param + '&channel=' + channel;
+  const url = LIVE_DATA_URL + sep + param + '&channel=' + channel +
+    (sameRegion(region, 'all') ? '' : '&region=' + encodeURIComponent(region));
 
   const promise = (async () => {
     let lastErr = null;
     for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++){
       try {
         const data = await fetchOnce(url);
+        // The feed says which location it answered for. An Apps Script
+        // that predates the location filter ignores ?region= and sends
+        // the whole site back; showing that under a province's name
+        // would be wrong numbers with a confident label, so refuse it.
+        if (!sameRegion(region, 'all') && !sameRegion(data.region || 'all', region)){
+          const mismatch = new Error('the feed didn\'t filter by location — the Apps Script needs the updated Code.gs deployed as a new version');
+          mismatch.fatal = true;
+          throw mismatch;
+        }
         const payload = {
           tree: data.tree,
           eventRows: data.eventsByPage || [],
           eventsError: data.eventsByPageError || null,
           pageSessions: data.pageSessions || null,
           channelTotals: data.channelTotals || null,
+          locationTotals: data.locationTotals || null,
           totalSessions: data.totalSessions,
           month: data.month,
           range: data.range || null,
@@ -1818,6 +2036,7 @@ function fetchCombination(period, channel){
         return payload;
       } catch (err){
         lastErr = err;
+        if (err && err.fatal) break;   // trying again won't change the answer
         if (attempt < FETCH_ATTEMPTS - 1) await wait(RETRY_PAUSE_MS[attempt] || 2500);
       }
     }
@@ -1828,33 +2047,34 @@ function fetchCombination(period, channel){
   return promise;
 }
 
-async function load(period, channel){
-  const key = comboKey(period, channel);
+async function load(period, channel, region){
+  region = region || 'all';
+  const key = comboKey(period, channel, region);
   const seq = ++requestSeq;
 
   // The buttons move the moment they're pressed; if the request fails
   // they move back to whatever is actually on screen.
-  setActiveButtons(period, channel);
+  setActiveButtons(period, channel, region);
 
   if (!LIVE_DATA_URL){
-    showFallback(period, channel, 'no Apps Script URL set in LIVE_DATA_URL');
+    showFallback(period, channel, region, 'no Apps Script URL set in LIVE_DATA_URL');
     return;
   }
 
-  const what = periodName(period) + ' · ' + CHANNEL_LABELS[channel].toLowerCase();
+  const what = periodName(period) + ' · ' + viewName(channel, region, true);
 
   // Real data already on hand (this visit, or saved from an earlier
   // one): show it now, no spinner, and refresh quietly if it's ageing.
   const cached = cachedFor(key);
   if (cached){
-    showPayload(cached, period, channel);
+    showPayload(cached, period, channel, region);
     setBusy(false);
     if (Date.now() - cached.fetchedAt > CLIENT_CACHE_MS){
-      fetchCombination(period, channel)
-        .then(fresh => { if (seq === requestSeq) showPayload(fresh, period, channel); })
+      fetchCombination(period, channel, region)
+        .then(fresh => { if (seq === requestSeq) showPayload(fresh, period, channel, region); })
         .catch(err => {
           if (seq !== requestSeq) return;
-          setDataStatus('Saved · ' + (cached.month || periodName(period)) + ' · ' + CHANNEL_LABELS[channel] +
+          setDataStatus('Saved · ' + (cached.month || periodName(period)) + ' · ' + viewName(channel, region) +
             ' · built ' + builtStamp(cached) + ' · couldn\'t refresh', 'fallback',
             'The live feed didn\'t answer: ' + friendlyError(err));
         });
@@ -1867,20 +2087,20 @@ async function load(period, channel){
   setDataStatus('Fetching ' + what + '…', 'busy');
 
   try {
-    const payload = await fetchCombination(period, channel);
+    const payload = await fetchCombination(period, channel, region);
     if (seq !== requestSeq) return;   // a later click already won
-    showPayload(payload, period, channel);
+    showPayload(payload, period, channel, region);
   } catch (err){
     if (seq !== requestSeq) return;
     console.warn('GA4 feed unavailable for ' + key + ':', err);
     if (state.live){
       // Something real is already on screen. Keep it, say what failed,
       // and put the buttons back where they belong.
-      setActiveButtons(state.period, state.channel);
+      setActiveButtons(state.period, state.channel, state.region);
       setDataStatus('Couldn\u2019t load ' + what + ' — still showing ' +
-        periodName(state.period) + ' · ' + CHANNEL_LABELS[state.channel].toLowerCase(), 'error', friendlyError(err));
+        periodName(state.period) + ' · ' + viewName(state.channel, state.region, true), 'error', friendlyError(err));
     } else {
-      showFallback(period, channel, friendlyError(err));
+      showFallback(period, channel, region, friendlyError(err));
     }
   } finally {
     if (seq === requestSeq) setBusy(false);
@@ -1896,24 +2116,26 @@ function periodName(period){
 
 // Once the first report is on screen, quietly collect the rest so the
 // first click on each is instant. The other traffic types for the
-// period showing come first, since that's the likeliest next switch.
+// view showing come first, since that's the likeliest next switch;
+// then every period and traffic type for All locations. Single
+// locations are left to be fetched when clicked.
 // One at a time, after a pause, so it never competes with what's open.
 function startPrefetch(){
   if (prefetchStarted || !LIVE_DATA_URL) return;
   prefetchStarted = true;
   setTimeout(async () => {
     const queue = [];
-    CHANNELS.forEach(ch => queue.push({ period: state.period, channel: ch }));
-    PERIODS.forEach(p => CHANNELS.forEach(ch => queue.push({ period: p, channel: ch })));
+    CHANNELS.forEach(ch => queue.push({ period: state.period, channel: ch, region: state.region }));
+    PERIODS.forEach(p => CHANNELS.forEach(ch => queue.push({ period: p, channel: ch, region: 'all' })));
 
     const seen = new Set();
     for (const job of queue){
-      const k = comboKey(job.period, job.channel);
+      const k = comboKey(job.period, job.channel, job.region);
       if (seen.has(k)) continue;
       seen.add(k);
       const have = cachedFor(k);
       if (have && Date.now() - have.fetchedAt < CLIENT_CACHE_MS) continue;
-      try { await fetchCombination(job.period, job.channel); }
+      try { await fetchCombination(job.period, job.channel, job.region); }
       catch (err){ /* retried when clicked */ }
       await wait(250);
     }
@@ -1922,13 +2144,13 @@ function startPrefetch(){
 
 document.querySelectorAll('.period-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    load({ mode: btn.dataset.mode, value: Number(btn.dataset.value) }, state.channel);
+    load({ mode: btn.dataset.mode, value: Number(btn.dataset.value) }, state.channel, state.region);
   });
 });
 document.querySelectorAll('.channel-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.dataset.channel === state.channel && state.live) return;
-    load(state.period, btn.dataset.channel);
+    load(state.period, btn.dataset.channel, state.region);
   });
 });
 
@@ -1948,7 +2170,7 @@ document.querySelectorAll('.channel-btn').forEach(btn => {
     const bad = !!(from && to && from > to);
     toEl.classList.toggle('bad', bad);
     if (!from || !to || bad) return;
-    load({ mode: 'custom', value: { start: from, end: to } }, state.channel);
+    load({ mode: 'custom', value: { start: from, end: to } }, state.channel, state.region);
   }
   document.getElementById('customApply').addEventListener('click', apply);
   [fromEl, toEl].forEach(el => {
@@ -1959,10 +2181,11 @@ document.querySelectorAll('.channel-btn').forEach(btn => {
 
 setView('pathway');
 renderChannelCounts();
-// Opens on organic traffic over the last twelve months — the widest view
-// of the traffic the site earns on its own. Every other period and
-// traffic type is one click away, and fetched in the background.
-load({ mode: 'range', value: 12 }, 'organic');
+renderLocations();
+// Opens on organic traffic from all locations over the last twelve
+// months — the widest view of the traffic the site earns on its own.
+// Every other period, traffic type and location is one click away.
+load({ mode: 'range', value: 12 }, 'organic', 'all');
 </script>
 </body>
 </html>
